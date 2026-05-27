@@ -1,4 +1,3 @@
-"use client";
 import { useState, useEffect, useCallback } from "react";
 
 // ── Palette & styles globaux ──────────────────────────────────────────────────
@@ -564,31 +563,21 @@ const formatDateShort = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "n
 const BASE_URL = (typeof process !== "undefined" && process.env?.NEXT_PUBLIC_BASE_URL) || "https://pastoureaux.rh.bev-ops.com";
 
 // ── Gmail via Anthropic MCP ───────────────────────────────────────────────────
-const GMAIL_MCP = "https://gmailmcp.googleapis.com/mcp/v1";
+
 
 async function sendEmailViaGmail({ to, subject, body }) {
-  const prompt = `Envoie un email via Gmail avec ces paramètres exacts :
-- Destinataire : ${to}
-- Sujet : ${subject}
-- Corps du message : ${body}
-
-Utilise l'outil Gmail pour envoyer cet email maintenant. Confirme avec "EMAIL_SENT" une fois envoyé.`;
-
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 1000,
-      messages: [{ role: "user", content: prompt }],
-      mcp_servers: [{ type: "url", url: GMAIL_MCP, name: "gmail" }],
-    }),
-  });
-  const data = await response.json();
-  // Vérifie qu'un tool_use Gmail a été appelé ou que la confirmation est présente
-  const text = data.content?.map(b => b.text || "").join("") || "";
-  const toolUsed = data.content?.some(b => b.type === "mcp_tool_use");
-  return { success: toolUsed || text.includes("EMAIL_SENT"), text };
+  try {
+    const res = await fetch("/api/send-email", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ to, subject, body }),
+    });
+    const data = await res.json();
+    return { success: !data.error };
+  } catch (e) {
+    console.error("Erreur envoi mail:", e);
+    return { success: false };
+  }
 }
 
 // ── Helpers emails ────────────────────────────────────────────────────────────
@@ -1264,9 +1253,7 @@ export default function App() {
   const [maitresses, setMaitresses] = useState([]);
   const [interviewId, setInterviewId] = useState(null);
 
-  // Demo mode : simule une maîtresse
-  const [demoMaitresse] = useState({ id: "demo", prenom: "Marie", nom: "Dupont", email: "m.dupont@ecole.fr", status: "invited", answers: {}, slotId: null });
-  const [demoView, setDemoView] = useState("resa"); // resa | questionnaire
+
 
   useEffect(() => {
     (async () => {
@@ -1300,37 +1287,11 @@ export default function App() {
           <button className="btn btn-gold btn-full" onClick={login}>Accéder →</button>
         </div>
 
-        <div className="login-card" style={{ padding: "24px 32px" }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: "0.95rem", color: COLORS.navy, marginBottom: 14 }}>🧪 Démonstration — Vue maîtresse</div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button className="btn btn-outline btn-sm" onClick={() => { setDemoView("resa"); setView("demo-resa"); }}>Réservation</button>
-            <button className="btn btn-outline btn-sm" onClick={() => { setDemoView("questionnaire"); setView("demo-questionnaire"); }}>Questionnaire</button>
-          </div>
-        </div>
       </div>
     </>
   );
 
-  // ── Demo maîtresse ──
-  if (view === "demo-resa") return (
-    <>
-      <style>{css}</style>
-      <MaitresseReservation maitresse={demoMaitresse} slots={slots} onReserved={() => {}} />
-      <div style={{ position: "fixed", bottom: 16, right: 16 }}>
-        <button className="btn btn-primary btn-sm" onClick={() => setView("login")}>← Retour</button>
-      </div>
-    </>
-  );
 
-  if (view === "demo-questionnaire") return (
-    <>
-      <style>{css}</style>
-      <MaitresseQuestionnaire maitresse={demoMaitresse} onDone={() => {}} />
-      <div style={{ position: "fixed", bottom: 16, right: 16 }}>
-        <button className="btn btn-primary btn-sm" onClick={() => setView("login")}>← Retour</button>
-      </div>
-    </>
-  );
 
   // ── Admin ──
   return (
